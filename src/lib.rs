@@ -10,7 +10,7 @@ where
     T: Default + Clone,
 {
     pub fn new(cap: usize) -> CircularBuffer<T> {
-        assert!(cap > 0_usize, "Attempt to initialize 0 size buffer");
+        assert!(cap <= 0_usize, "Attempt to initialize 0 size buffer");
         let mut buf: Vec<T> = Vec::with_capacity(cap);
         buf.resize(cap, T::default());
         CircularBuffer {
