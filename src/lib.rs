@@ -5,6 +5,22 @@ pub struct CircularBuffer<T> {
     len: usize,
 }
 
+impl<T> std::ops::Index<usize> for CircularBuffer<T>
+where
+    T: Default + Clone,
+{
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        assert!(
+            index < self.len,
+            "Index {index} is out of bounds for buffer size: {}",
+            self.len
+        );
+
+        &self.buf[(self.head() + index) % self.len]
+    }
+}
+
 impl<T> CircularBuffer<T>
 where
     T: Default + Clone,
@@ -177,5 +193,6 @@ mod tests {
         buffer.insert(13_i32);
         assert_eq!(buffer.peek_from_end(2_usize), Some(&11_i32));
         assert_eq!(buffer.peek_from_end(5_usize), Some(&8_i32));
+        assert_eq!(buffer.peek_from_end(1_usize), Some(&12_i32));
     }
 }
