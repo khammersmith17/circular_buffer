@@ -37,6 +37,10 @@ where
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
     pub fn insert(&mut self, item: T) {
         self.len = std::cmp::min(self.cap, self.len + 1);
         self.tail = (self.tail + 1) % self.cap;
