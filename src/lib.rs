@@ -1,8 +1,9 @@
 use std::fmt;
+use std::mem::MaybeUninit;
 use std::mem::{replace as mem_replace, take as mem_take};
 
 pub struct CircularBuffer<T> {
-    buf: Vec<T>,
+    buf: Vec<MaybeUninit<T>>,
     cap: usize,
     tail: usize,
     len: usize,
@@ -20,18 +21,17 @@ where
             self.len
         );
 
-        &self.buf[(self.head() + index) % self.len]
+        // unsafe index into the buffer
+        // deref raw pointer and pass a reference
+        unsafe { &*self.buf[(self.head() + index) % self.len].as_ptr() }
     }
 }
 
-impl<T> CircularBuffer<T>
-where
-    T: Default + Clone,
-{
+impl<T> CircularBuffer<T> {
     pub fn new(cap: usize) -> CircularBuffer<T> {
         assert!(cap > 0_usize, "Attempt to initialize 0 size buffer");
-        let mut buf: Vec<T> = Vec::with_capacity(cap);
-        buf.resize(cap, T::default());
+        let mut buf: Vec<MaybeUninit<T>> = Vec::with_capacity(cap);
+        unsafe { buf.set_len(cap) }
         CircularBuffer {
             buf,
             tail: cap - 1_usize,
@@ -45,20 +45,28 @@ where
     }
 
     pub fn insert(&mut self, item: T) {
-        self.len = std::cmp::min(self.cap, self.len + 1);
         self.tail = (self.tail + 1) % self.cap;
-        let _ = mem_replace(&mut self.buf[self.tail], item);
+        unsafe { self.buf[self.tail].as_mut_ptr().write(item) }
+        self.len += 1;
+    }
+
+    unsafe fn fetch_item(&self, i: usize) -> &T {
+        unsafe { &*self.buf[i].as_ptr() }
     }
 
     pub fn peek_tail(&self) -> Option<&T> {
         if self.len > 0 {
-            Some(&self.buf[self.tail])
+            let item = unsafe { self.fetch_item(self.tail) };
+            Some(item)
         } else {
             None
         }
     }
 
-    pub fn head(&self) -> usize {
+    fn head(&self) -> usize {
+        if self.len == 0 {
+            return 0_usize;
+        }
         (self.tail + self.len + 1) % self.len
     }
 
@@ -66,21 +74,25 @@ where
         if len_from_tail > self.len {
             return None;
         }
+
         let i = if len_from_tail > self.tail {
-            if self.len != self.cap {
+            let sub = len_from_tail - self.tail;
+            if sub > self.cap {
                 return None;
             }
-            self.cap - (len_from_tail - self.tail)
+            self.cap - sub
         } else {
             self.tail - len_from_tail
         };
 
-        Some(&self.buf[i])
+        let item = unsafe { self.fetch_item(i) };
+        Some(item)
     }
 
     pub fn peek_head(&self) -> Option<&T> {
         if self.len > 0 {
-            Some(&self.buf[self.head()])
+            let item = unsafe { self.fetch_item(self.head()) };
+            Some(item)
         } else {
             None
         }
@@ -287,7 +299,7 @@ mod tests {
         // 12 items
         // tail is index 1
         // head should be tail + 1 when it is wrapped
-        assert_eq!(head, 0_usize);
+        assert_eq!(head, 10_usize);
     }
 
     #[test]
@@ -336,7 +348,6 @@ mod tests {
         buffer.insert(13_i32);
         let mut end = 0_usize;
         while let Some(ticker) = buffer.peek_from_end(end) {
-            println!("{ticker}");
             end += 1;
         }
     }
