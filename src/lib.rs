@@ -2,14 +2,14 @@ use std::fmt;
 use std::mem::MaybeUninit;
 use std::mem::{replace as mem_replace, take as mem_take};
 
-pub struct CircularBuffer<T> {
+pub struct CircularBuffer<T: Copy> {
     buf: Vec<MaybeUninit<T>>,
     cap: usize,
     tail: usize,
     len: usize,
 }
 
-impl<T> std::ops::Index<usize> for CircularBuffer<T>
+impl<T: Copy> std::ops::Index<usize> for CircularBuffer<T>
 where
     T: Default + Clone,
 {
@@ -27,7 +27,7 @@ where
     }
 }
 
-impl<T> CircularBuffer<T> {
+impl<T: Copy> CircularBuffer<T> {
     pub fn new(cap: usize) -> CircularBuffer<T> {
         assert!(cap > 0_usize, "Attempt to initialize 0 size buffer");
         let mut buf: Vec<MaybeUninit<T>> = Vec::with_capacity(cap);
@@ -347,7 +347,7 @@ mod tests {
         buffer.insert(12_i32);
         buffer.insert(13_i32);
         let mut end = 0_usize;
-        while let Some(ticker) = buffer.peek_from_end(end) {
+        while let Some(_ticker) = buffer.peek_from_end(end) {
             end += 1;
         }
     }
